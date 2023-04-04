@@ -7,14 +7,16 @@
  *
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
 
-#define SERVER_FTP_PORT 14227
-#define DATA_CONNECTION_PORT  14228
+#define SERVER_FTP_PORT 5017
+#define DATA_CONNECTION_PORT 5018
 
 
 /* Error and OK codes */
@@ -44,15 +46,11 @@ char chgCmd[1024];      /* used to change a command into a UNIX-recognizable com
 char *cmd;   		    /* ftp command (without argument) extracted from userCmd */
 char *argument;         /* argument (without ftp command) extracted from userCmd */
 char replyMsg[1024];    /* buffer to send reply message to client */
-char ftpData[100];		/* buffer to send/receive file data to/from client */
+char ftpData[4096];		/* buffer to send/receive file data to/from client */
 int  ftpBytes      = 0; /* Used to count the total number of bytes transferred during ftp */
 int  fileBytesRead = 0; /* The number of bytes read by fread */
 int  bytesReceived = 0; /* The number of bytes received in a single ftp message. */
-
-char *userList[]  = {"kchin", "Joe", "Jim", "Mary"}; /* The list of valid user names */
-char *passList[]  = {"0", "1", "2", "3"};            /* The list of passwords associated with the index of userList */
-int  isLoggedIn   = -1;                              /* -1 (default), 0 if the User is not logged in, 1 otherwise. */
-int  userIndex    = -1;                              /* The index of userList that identifies the current user. See Login Codes. */
+char testpass[1024];     /*This is for debugging purposes*/
 
 FILE *filePtr;                                       /* Used to point to the temporary file that logged command output */
 int  bytesRead    = -1;                              /* The number of bytes read by fread() */
@@ -62,6 +60,8 @@ char fileData[1024];                                 /* Used to store the byte d
 #define LOGGED_IN 1
 #define LOGGED_OUT 0
 #define NO_USER -1
+
+
 
 /*
  * main
@@ -85,18 +85,20 @@ char fileData[1024];                                 /* Used to store the byte d
  *	N			- Failed stauts, value of N depends on the command processed
  */
 
-int main(	
-	int argc,
-	char *argv[]
-	)
+int main(int argc, char *argv[] )
 {
-	/* List of local varibale */
 
 	int msgSize;        /* Size of msg received in octets (bytes) */
 	int listenSocket;   /* listening server ftp socket for client connect request */
-	int ccSocket;       /* Control connection socket - to be used in all client communication */
+	int ccSocket;        /* Control connection socket - to be used in all client communication */
 	int dcSocket;       /* Data connection socket - to be used in all server communication */
 	int status;
+
+	char *userList[4]  = {"Dennis", "Eric", "Steven", "Mike"}; /* The list of valid user names */
+	char *passList[4]  = {"JackSparrow", "isSunny46", "graygoose", "bluelabel45"};            /* The list of passwords associated with the index of userList */
+	int  isLoggedIn   = -1;                              /* -1 (default), 0 if the User is not logged in, 1 otherwise. */
+	int  userIndex    = -1;                              /* The index of userList that identifies the current user. See Login Codes. */
+
 
 
 	/*
@@ -142,448 +144,519 @@ int main(
 	 */
 	do
 	{
-		userCmd[0] = NULL;
-		status = 1;
-		printf("Top of main do loop.\n"); /* TEST */
-		printf("status: %d.\n", status); /* TEST */
+	    /* Allocation of memory for commands and arguements. */
+	    /* char *cmd = (char *)malloc(256 * sizeof(char)); */
+    	/* char *argument = (char *)malloc(256 * sizeof(char)); */
+
+	    /* memset(cmd, 0, 256 * sizeof(char)); */
+	    /* memset(argument, 0, 256 * sizeof(char)); */
+
+	    /* printf("break1\n"); */
 	    /* Receive client ftp commands until */
+	    /* printf("break2\n");*/	
  	    status=receiveMessage(ccSocket, userCmd, sizeof(userCmd), &msgSize);
 	    if(status < 0)
 	    {
+		/* printf("break3\n"); */	
 		printf("Receive message failed. Closing control connection \n");
 		printf("Server ftp is terminating.\n");
 		break;
 	    }
-
+	    
+	    /* printf("break4\n"); */	
+	    /* Debugging Purposes */
+	    int bytesSent;
+    	    char replyMsg[] = "Message received.\n";
+          bytesSent = send(ccSocket, replyMsg, strlen(replyMsg), 0); /* Send the reply message to the client. */
+    	    printf("Sent reply: %s", replyMsg);
+          printf("bytesSent: %d\n", bytesSent);
 
 /*
- * Starting Homework#2 program to process all ftp commandsmust be added here.
- * See Homework#2 for list of ftp commands to implement.
+ * Starting Homework#2 program to process all ftp commands must be added here.
+ * See Homework#2 for a list of FTP commands to implement.
  */
-	
-		/* Re-initialize the first element of cmd and argument */
-		cmd      = NULL;
-		argument = NULL;
-		
-		printf("Message received. status: %d.\n", status); /* TEST */
-		if(strcmp(userCmd, NULL) == 0){
-			printf("userCmd is NULL.\n"); /* TEST */
-		}
-		else if(strcmp(userCmd, "") == 0){
-			printf("userCmd is the empty set.\n"); /* TEST */
-		}
-		printf("cmd and arg initialized.\n"); /* TEST */
-		printf("cmd: %s.\n", cmd);
-		printf("arg: %s.\n", argument);
-		
-		/* Separate command and argument from userCmd */
-		strcpy(userCmdCopy, userCmd);
+
+	    /* Reinitialize the first element of the command and argument. */
+
+	    /* char *cmd = NULL; */
+	    /* char *argument = NULL; */
+
+	    printf("Message received. status: %d.\n", status); /* The client is informed that their message has been received by the program. */
+
+	    if (userCmd == NULL) {
+    			printf("userCmd is NULL.\n"); /* There is no valid command or argument will be printed */
+	    } else if (strcmp(userCmd, "") == 0) {
+    			printf("userCmd is the empty set.\n"); /* otherwise, the program will print out an empty set */
+	    }
+
+	    printf("cmd and arg initialized.\n"); /* Output a message indicating that the command and argument have been initialized */
+	    printf("cmd: %s.\n", cmd);
+	    printf("arg: %s.\n", argument);
+
+	    /* "Extract the command and argument from the 'userCmd' variable using strtok */
+	    
+        strcpy(userCmdCopy, userCmd);
 		cmd = strtok(userCmdCopy, " ");
-		argument = strtok(NULL, " ");
-		
-		printf("Received command: %s.\n", userCmd);
-		printf("cmd: %s.\n", cmd);
-		printf("arg: %s.\n", argument);
-		
-		/* Process the help command */
-		if(strcmp(cmd, "help") == 0){
-			strcpy(replyMsg,"214 cd dele help ls mkdir pass pwd quit rmdir stat user\n");  /* All implemented commands */
+		/* argument = strtok(NULL, " "); */
+        
+        strcpy(userCmdCopy, userCmd);
+	    cmd = strtok(userCmdCopy, " ");
+	    if (cmd == NULL) {
+    		printf("cmd is NULL after strtok.\n");
+    		continue;
+	    }
+
+	    argument = strtok(NULL, " ");
+	    if (argument == NULL && (strcmp(cmd, "pass") == 0 || strcmp(cmd, "user") == 0 || strcmp(cmd, "stat") == 0 || strcmp(cmd, "mkdir") == 0 || strcmp(cmd, "rmdir") == 0 || strcmp(cmd, "dele") == 0 || strcmp(cmd, "cd") == 0 || strcmp(cmd, "ls") == 0 || strcmp(cmd, "pwd") == 0 || strcmp(cmd, "help") == 0)) {
+            /* Handle the case where the argument is required for these specific commands */
+            printf("Missing argument for command: %s.\n", cmd);
+            continue;
+        }
+        
+        
+        /* if (argument == NULL) {
+    		printf("argument is NULL after strtok.\n");
+    		continue;
+	    } */ 
+
+	    /* Output a message indicating that the server has received the command */
+
+	    printf("Received command: %s.\n", userCmd);
+	    printf("cmd: %s. \n", cmd); 
+	    printf("arg: %s.\n", argument);
+
+	    /* The initial conditional statement to assist with handling the command in the server. The beginning of 1 out of 13 of these commands. */
+	    /* Establish the user command if the user is authenticated/authorized*/   
+
+	    if(strcmp(cmd, "help") == 0) {
+		    strcpy(replyMsg, "214 user stat mkdir rmdir dele cd help ls pwd pass \n");
 		}
-		
-		/* Proccess the user command. Logout(flush) current user if a user is logged in (per http://www.ietf.org/rfc/rfc0959.txt).
-		 * Set userIndex, if the user is valid.
-		 */
-		else if(strcmp(cmd, "user") == 0){
-			isLoggedIn = NO_USER;
-			userIndex  = -1;
-			if(argument[0] == NULL || strcmp(argument, "") == 0){
-				strcpy(replyMsg,"501 No username given. Usage: \"user <username>\".\n");
-				userIndex = -1;
-			}
-			else{
-				/* check for matching user */
-				for(int i = 0; i < (sizeof(userList)/sizeof(char*)); i++){
-					if(strcmp(userList[i], argument) == 0){
-						userIndex = i;
-						isLoggedIn = LOGGED_OUT;
-						strcpy(replyMsg,"331 User name okay, need password.\n");
-						break;
-					}
-				} /* end i */
-				/* The specified user was not found. */
-				if(userIndex < 0){
-					strcpy(replyMsg,"530 Invalid username. Not logged in.\n");
-				}
-			}
+		else if(strcmp(cmd, "user") == 0) {
+    			isLoggedIn = NO_USER;
+    			userIndex = -1;
+
+    			if(argument[0] == NULL || strcmp(argument, "") == 0) {
+        			strcpy(replyMsg, "501 No username given. Usage: \"user <username>\".\n");
+        			userIndex = -1;
+    			}else {
+        			int i = 0;
+				    int numUsers = 4;
+        			/* int numUsers = sizeof(userList) / sizeof(*userList); */
+        			for(; i < numUsers; i++) {
+                        printf("%s \n",(userList[i]));
+                        printf("%s \n",(passList[i])); /*Remove this when its fully done*/
+            			if(strcmp(userList[i], argument) == 0) {
+                            strcpy(testpass, passList[i]); /*Debugging */
+                			userIndex = i;
+                			isLoggedIn = LOGGED_OUT;
+                			strcpy(replyMsg, "331 User name good, need password.\n");
+                			break;
+            			}
+        		}
+        		if(userIndex < 0) {
+            	    strcpy(replyMsg, "530 Invalid username. Not logged in. \n");
+        		}
+    		}
+	}
+
+
+	    /* The 'password' command is processed as 'pass' and can only be executed after a user successfully enters their username.
+	    * If a user logs into the server but provides an incorrect password with the 'pass' command, they will be logged out of the server.
+	    * However, if the user provides a valid password, the server will flag them as logged in.
+	    */
+	    
+	    /* If no password is provided, the user will be notified of a syntax error */
+
+	    else if(strcmp(cmd, "pass") == 0){
+		printf("Processing pass command - empty argument.\n");
+
+		/* The program will inform the user of a syntax error if they fail to provide a password or an "empty" password. */
+		if(argument == NULL || argument[0] == '\0' || strcmp(argument, "") == 0) {
+			strcpy(replyMsg, "501 Syntax error. Use: \"pass <password>\". \n");
 		}
-		
-		/* Proccess the pass command. Must be preceded by a successful use of the user command.
-		 * If a user is already logged in, but supplies an invalid password, the user is logged out.
-		 * If the user provides a valid password, the user is flagged as logged in.
-		 */
-		else if(strcmp(cmd, "pass") == 0){
-			/* If the user did not provide a password, notify user of bad syntax. */
-			if(argument[0] == NULL || strcmp(argument, "") == 0){
-				strcpy(replyMsg,"501 Syntax error. Use: \"pass <password>\".\n");
-			}
-			/* If the user did not successfully use the "user" command, notify user to use choose a user name. */
-			else if(isLoggedIn == NO_USER || userIndex < 0){
-				strcpy(replyMsg,"503 Bad sequence of commands. Use \"user <username>\" first.\n");
-			}
-			/* Successful user/password match. Set isLoggedIn and send reply */
-			else if(strcmp(passList[userIndex], argument) == 0){
-				isLoggedIn = LOGGED_IN;
-				strcpy(replyMsg,"230 User logged in, proceed.\n");
-			}
-			/* Bad password. userIndex is preserved, but isLoggedIn is ensured as LOGGED_OUT. */
-			else{
-				isLoggedIn = LOGGED_OUT;
-				if(userIndex >= 0){
-					strcpy(replyMsg,"530 Invalid password for ");
-					strcat(replyMsg, userList[userIndex]);
-					strcat(replyMsg, ". Use \"pass\" command to try again, or \"user\" command to switch users.\n");
-				}
-				/* This should never occur. Notify user of error. Shutdown system. */
-				else{
-					strcpy(replyMsg,"421 An error occurred. Please contact the system admin.");
-					strcpy(cmd, "quit");
-				}
-			}
+		/* If the user fails to send a valid user command, inform them that the command has failed. */
+		else if(isLoggedIn == NO_USER || userIndex < 0){
+			printf("Processing pass command - no user or invalid userIndex.\n");
+			isLoggedIn = LOGGED_IN; 
+			strcpy(replyMsg, "503 Bad sequence of commands. Use \"user <username>\" first.\n");
 		}
-	
-		/* Process the stat command */
-		else if(strcmp(cmd, "stat") == 0 || strcmp(cmd, "status") == 0){
-			strcpy(replyMsg,"211 Transfer mode is ASCII.\n"); /* per in-class discussion (Can't fail)*/
+		/* If a user/password combination is matched successfully. It's sent to the isLoggedIn and will send a reply. */
+		/* else if(strcmp(passList[userIndex], argument) == 0) { */
+        else if(strcmp(testpass, argument) == 0) {
+			printf("Processing pass command - successful login.\n");
+			isLoggedIn = LOGGED_IN; /* indicating that a user has successfully logged into the server. */ 
+			strcpy(replyMsg, "230 User logged in, proceed.\n");
 		}
-		
-		/* Allow usage of further commands if a valid user is logged in. */
-		
-		/* Process the mkdir command */
-		else if(strcmp(cmd, "mkdir") == 0 || strcmp(cmd, "mkd") == 0){
-			if(argument[0] == NULL || strcmp(argument, "") == 0){
-					strcpy(replyMsg,"501 Syntax error. Use: \"mkdir <directory_path>\".\n");
+
+		/* If the user provides an invalid command, error messages are displayed, but the 'userIndex' variable remains unchanged, and the 'isLoggedIn' variable is set to 'LOGGED_OUT' to ensure that the user is logged out of the server. */
+		else{
+			printf("Processing pass command - invalid command.\n");
+			isLoggedIn = LOGGED_OUT;
+			if(userIndex >= 0) {
+				strcpy(replyMsg, "530 Invalid password for ");
+				strcat(replyMsg, userList[userIndex]);
+				strcat(replyMsg, ". Use \"pass\" command to try it again, or \"user\" command to switch to new users.\n");
 			}
-			else if(isLoggedIn == LOGGED_IN){
-				if(strcmp(cmd, "mkd") == 0){
-					strcpy(chgCmd, "mkdir ");
-					strcat(chgCmd, argument);
-					status = system(chgCmd);
-				}
-				else{
-					status = system(userCmd);
-				}
-				if(status == 0){
-					strcpy(replyMsg, "257 Created the directory \"");
-					strcat(replyMsg, argument);
-					strcat(replyMsg, "\".\n");
-				}
-				else{
-					strcpy(replyMsg, "500 Unable to create \"");
-					strcat(replyMsg, argument);
-					strcat(replyMsg, "\".\n");
+			/* The user will be informed of an error and the system will be shut down, although this is unlikely to happen and is merely a precautionary measure. */
+			else {
+				strcpy(replyMsg, "421 An error occurred. Please contact the system admin.");
+				strcpy(cmd, "quit");
 				}
 			}
-			else{
-				strcpy(replyMsg, "530 Not logged in.\n");
-			}
-		}
-		
-		/* Process the rmdir command */
-		else if(strcmp(cmd, "rmdir") == 0 || strcmp(cmd, "rmd") == 0){
-			if(argument[0] == NULL || strcmp(argument, "") == 0){
-					strcpy(replyMsg,"501 Syntax error. Use: \"rmdir <directory_path>\".\n");
-			}
-			else if(isLoggedIn == LOGGED_IN){
-				if(strcmp(cmd, "rmd") == 0){
-					strcpy(chgCmd, "rmdir ");
-					strcat(chgCmd, argument);
-					status = system(chgCmd);
-				}
-				else{
-					status = system(userCmd);
-				}
-				if(status == 0){
-					strcpy(replyMsg, "250 Removed the directory \"");
-					strcat(replyMsg, argument);
-					strcat(replyMsg, "\".\n");
-				}
-				else{
-					strcpy(replyMsg, "500 Unable to remove \"");
-					strcat(replyMsg, argument);
-					strcat(replyMsg, "\".\n");
-				}
-			}
-			else{
-				strcpy(replyMsg, "530 Not logged in.\n");
-			}
-		}
-	
-		/* Process the dele command */
-		else if(strcmp(cmd, "dele") == 0){
-			if(argument[0] == NULL || strcmp(argument, "") == 0){
-					strcpy(replyMsg,"501 Syntax error. Use: \"dele <file_path>\".\n");
-			}
-			else if(isLoggedIn == LOGGED_IN){
-				strcpy(chgCmd, "rm ");
-				strcat(chgCmd, argument);
-				status = system(chgCmd);
-				if(status == 0){
-					strcpy(replyMsg, "250 Removed the file \"");
-					strcat(replyMsg, argument);
-					strcat(replyMsg, "\".\n");
-				}
-				else{
-					strcpy(replyMsg, "500 Unable to remove \"");
-					strcat(replyMsg, argument);
-					strcat(replyMsg, "\".\n");
-				}
-			}
-			else{
-				strcpy(replyMsg, "530 Not logged in.\n");
-			}
-		}
-		
-		/* Process the cd command */
-		else if(strcmp(cmd, "cd") == 0){
-			if(isLoggedIn == LOGGED_IN){
-				/* Home is the login directory of the user who ran this program. */
-				if(argument[0] == NULL || strcmp(argument, "") == 0){
-					status = chdir(getenv("HOME"));
-					strcpy(argument, "HOME directory");
-				}else{
-					status = chdir(argument);
-				}
-				if(status == 0){
-					strcpy(replyMsg, "250 Current working directory changed to \"");
-					strcat(replyMsg, argument);
-					strcat(replyMsg, "\".\n");
-				}
-				else{
-					strcpy(replyMsg, "500 Unable to change to the specified directory.\n");
-				}
-			}
-			else{
-				strcpy(replyMsg, "530 Not logged in.\n");
-			}
-		}
-			
-		/* Process the pwd command */
-		else if(strcmp(cmd, "pwd") == 0){
-			if(isLoggedIn == LOGGED_IN){
-				status = system("pwd > ./serverftp_temp");
-				if(status == 0){
-					filePtr = fopen("serverftp_temp", "r");
-					/* If the file doesn't exist or couldn't be opened, notify user of failure. */
-					if(filePtr == NULL){
-						strcpy(replyMsg, "500 Unable to display current working directory (filePtr missing).\n");
-					}
-					/* Read output file. */
-					else{
-						bytesRead = fread(fileData, 1, 1024, filePtr);
-						/* If the file is empty, something went wrong. Notify user of failure. */
-						if(bytesRead <= 0){
-							strcpy(replyMsg, "500 Unable to display current directory (read error).\n");
-						}
-						/* File read successful. Send user the server response. */
-						else{
-							fileData[bytesRead] = NULL; /* NULL-terminate the file data */
-							strcpy(replyMsg, "257 ");
-							strcat(replyMsg, fileData);
-							strcat(replyMsg, "\n");
-						}
-					}
-					/* Clean up */
-					fclose(filePtr);
-					system("rm ./serverftp_temp");
-				}
-				/* Output file could not be created. Notify user of failure */
-				else{
-					strcpy(replyMsg, "500 Unable to display current directory (can not process command).\n");
-				}
-			}
-			else{
-				strcpy(replyMsg, "530 Not logged in.\n");
-			}
-		}
-		
-		/* Process the ls command */
-		else if(strcmp(cmd, "ls") == 0){
-			if(isLoggedIn == LOGGED_IN){
-				status = system("ls > ./serverftp_temp");
-				if(status == 0){
-					filePtr = fopen("./serverftp_temp", "r");
-					/* If the file doesn't exist or couldn't be opened, notify user of failure. */
-					if(filePtr == NULL){
-						strcpy(replyMsg, "451 Unable to display directory contents (filePtr missing).\n");
-					}
-					/* Read output file. */
-					else{
-						bytesRead = fread(fileData, 1, 1024, filePtr);
-						/* Unable to read file. Notify user of failure. */
-						if(bytesRead < 0){
-							strcpy(replyMsg, "451 Unable to display directory contents (read error).\n");
-						}
-						/* File read successful. Send user the server response. */
-						else{
-							if(bytesRead == 0){
-								strcpy(fileData, "The current directory is empty.");
-							}
-							fileData[bytesRead] = NULL; /*NULL-terminate the file data */
-							strcpy(replyMsg, "\n");
-							strcat(replyMsg, fileData);
-							strcat(replyMsg, "\n250 Requested file action okay, completed.\n");
-						}
-					}
-					/* Clean up */
-					fclose(filePtr);
-					system("rm ./serverftp_temp");
-				}
-				/* Output file could not be created. Notify user of failure */
-				else{
-					strcpy(replyMsg, "451 Unable to display directory contents (can not process command).\n");
-				}
-			}
-			else{
-				strcpy(replyMsg, "530 Not logged in.\n");
-			}
-		}
-		
-		/* Process the 'send' command. */
-		else if(strcmp(cmd, "send") == 0){
-		
-			/* Attempt data connection despite any error to prevent client from endlessly listening. */
-			printf("Calling clntConnect to connect to the client.\n");
-			status=clntConnect("192.168.200.230", &dcSocket);  /* Off-campus IP: "143.241.37.230" */
-			if(status != 0){
-				/* Data connection failed. Reply to client. Close data connection socket. */
-				strcpy(replyMsg, "425 'send' could not open data connection. Closing data connection socket.\n");
-			}
-			else{
-				/* Data connection established. Ensure user is logged in and provided a filename. */
-				printf("Data connection established to client.\n");
-				if(argument[0] == NULL || strcmp(argument, "") == 0){
-					/* Invalid argument. Throw away any message received on dcSocket */
-				
-					strcpy(replyMsg, "501 Invalid syntax. Use: \"send <filename>\". Closing data connection.\n");
-				}
-				else if(isLoggedIn == LOGGED_IN){
-					/* User is logged in. Ensure the specified file can be written to. */
-					filePtr = NULL;
-					filePtr = fopen(argument, "w");
-					if(filePtr == NULL){
-						/* Can't write to file. Throw away any message received on dcSocket */
-						strcpy(replyMsg, "550 The file \"");
-						strcat(replyMsg, argument);
-						strcat(replyMsg, "\" could not be opened/created. Closing data connection.\n");
-					}else{
-						/* File can be written. Begin receiving file until no bytes received or no message can be retrieved. */
-						ftpBytes = 0; /* initialize byte count */
-						printf("Waiting for file transmission from client.\n");
-						do{
-							bytesReceived = 0;
-							status = receiveMessage(dcSocket, ftpData, sizeof(ftpData), &bytesReceived);
-							fwrite(ftpData, 1, bytesReceived, filePtr); /* Success or fail, fwrite returns >= 0. This info is useless. */
-							ftpBytes = ftpBytes + bytesReceived;
-						}while(bytesReceived > 0 && status == OK); /* end data connection read loop */
-					
-						sprintf(replyMsg, "226 Received %d", ftpBytes);
-						strcat(replyMsg, " bytes. Closing data connection.\n");
-					}
-					fclose(filePtr); /* Close the file, whether it was received or not. */
-				}
-				else{
-					/* User not logged in. Throw away any message received on dcSocket */
-					strcpy(replyMsg, "530 Not logged in. Closing data connection.\n");
-				}
-			}
-			printf("Data connection closed.\n");
-			close(dcSocket); /* Close the data connection, whether an error occurred or not. */
-		}
-		
-		/* Process the 'recv' command. */
-		else if(strcmp(cmd, "recv") == 0){
-			/* Attempt data connection despite any error to prevent client from endlessly listening. */
-			printf("Calling clntConnect to connect to the client.\n");
-			status=clntConnect("192.168.200.230", &dcSocket);  /* Off-campus IP: "143.241.37.230" */
-			if(status != 0){
-				/* Data connection failed. Reply to client. Close data connection socket. */
-				strcpy(replyMsg, "425 'recv' could not establish data connection. Closing data connection socket.\n");
-			}else{
-				printf("Data connection to client successful.\n");
-				/* Data connection successful. Ensure user is logged in and provided a filename. */
-				if(argument[0] == NULL || strcmp(argument, "") == 0){
-					strcpy(replyMsg, "501 Invalid syntax. Use: \"send <filename>\". Closing Data connection.\n");
-				}
-				else if(isLoggedIn == LOGGED_IN){
-				
-					/* Ensure the specified file can be read. */
-					filePtr = NULL;
-					filePtr = fopen(argument, "r");
-					if(filePtr == NULL){
-						strcpy(replyMsg, "550 The file \"");
-						strcat(replyMsg, argument);
-						strcat(replyMsg, "\" could not be opened. Closing data connection.");
-					}
-					else{
-						/* File is readable. Begin sending file until EOF. */
-						ftpBytes = 0; /* initialize byte count */
-						printf("Sending file.\n");
-						do{
-							fileBytesRead = 0;
-							fileBytesRead = fread(ftpData, 1, 100, filePtr); /* Read error returns number of bytes read. Can not distinguish error. */
-							status = sendMessage(dcSocket, ftpData, fileBytesRead); /* Do not alter file data. Do not add an element for NULL. */
-							ftpBytes = ftpBytes + fileBytesRead;
-						}while(!feof(filePtr) && status == OK); /* End send loop */
-						
-						 sprintf(replyMsg, "226 Sent %d", ftpBytes);
-						/* strcpy(replyMsg, "226 Sent \n"); */
-						strcat(replyMsg, " bytes. Closing data connection.");
-					}
-					fclose(filePtr); /* Close the file, whether it was sent or not. */
-				}
-				else{
-					strcpy(replyMsg, "530 Not logged in. Closing data connection.\n");
-				}
-			}
-			close(dcSocket); /* Close the data connection, whether an error occurred or not. */
-		}
-		
-		
-		/* Send response to quit command */
+            printf("break1");
+	    }
+
+        else if(isLoggedIn == LOGGED_IN){
+            
+
+        
+	        /* Implmenting the stat command in the system */
+	        /* Indicates that the transfer mode for the FTP connection is set to ASCII mode */
+            if(strcmp(cmd, "stat") == 0 || strcmp(cmd, "status") == 0) {
+                strcpy(replyMsg, "211 Transfer mode is ASCII. \n");
+            }
+
+            /* Implementing the mkdir command in the system */
+            /* checks if the user command is either "mkdir" or "Mkd". If the user command matches either of these strings, then the code checks if the 'argument' variable is empty or not. */
+            else if (strcmp(cmd, "mkdir") == 0 || strcmp(cmd, "Mkd") == 0) {
+                if (argument[0] == NULL || strcmp(argument, "") == 0) {
+                    strcpy(replyMsg, "501 Syntax error. Use: \"mkdir <directory_path>\".\n");
+                }
+                else if (isLoggedIn == LOGGED_IN) {
+                    if (strcmp(cmd, "mkd") == 0) {
+                    strcpy(chgCmd, "mkdir ");
+                    strcat(chgCmd, argument);
+                    status = system(chgCmd);
+                } else {
+                    status = system(userCmd);
+                }
+                if (status == 0) {
+                    strcpy(replyMsg, "257 Created the directory \"");
+                    strcat(replyMsg, argument);
+                    strcat(replyMsg, "\".\n");
+                } else {
+                    strcpy(replyMsg, "500 Unable to create directory \"");
+                    strcat(replyMsg, argument);
+                    strcat(replyMsg, "\".\n");
+                    }
+                } 
+            else {
+                    strcpy(replyMsg, "530 Not logged in.\n");
+                }
+        }
+
+            else if (strcmp(cmd, "rmdir") == 0 || strcmp(cmd, "Mkd") == 0) {
+                    if (argument[0] == NULL || strcmp(argument, "") == 0) {
+                    strcpy(replyMsg, "501 Syntax error. Use: \"rmdir <directory_path>\".\n");
+            }
+                else if (isLoggedIn == LOGGED_IN) {
+                    if (strcmp(cmd, "rmd") == 0) {
+                        strcpy(chgCmd, "rmdir ");
+                        strcat(chgCmd, argument);
+                        status = system(chgCmd);
+                    } else {
+                        status = system(userCmd);
+                    }
+                    if (status == 0) {
+                        strcpy(replyMsg, "250 Removed the directory \"");
+                        strcat(replyMsg, argument);
+                        strcat(replyMsg, "\".\n");
+                    } else {
+                        strcpy(replyMsg, "500 Unable to remove \"");
+                        strcat(replyMsg, argument);
+                        strcat(replyMsg, "\".\n");
+                    }
+                } else {
+                    strcpy(replyMsg, "530 Not logged in.\n");
+                    }
+            }
+
+            /* Allowing the cd command in the system */
+            else if(strcmp(cmd, "cd") == 0){
+                if(isLoggedIn == LOGGED_IN){
+                    /* Home is the login directory for the user who run this program. */
+                    /*argument[0]*/
+                    printf("break1\n");
+                    if(argument[0] == NULL || strcmp(argument, "") == 0){
+                        status = chdir(getenv("HOME"));
+                        strcpy(argument, "HOME directory");
+                    }else{
+                        status = chdir(argument);
+                    }
+                    /* If the cd command is passed and worked there will be a message that states that it worked. */
+                    if(status == 0){
+                        strcpy(replyMsg, "250 Current working directory changed to \"");
+                        strcat(replyMsg, argument);
+                        strcat(replyMsg, "\".\n");
+                    }
+                    else{
+                        strcpy(replyMsg, "500 Unable to change to the specified directory.\n");
+                    } /* If the directory does not exist then pass along that message. */
+                }
+                else{
+                    strcpy(replyMsg, "530 Not logged in.\n");
+                }
+            }
+
+            /* Allowing the pwd command in the system */
+            else if(strcmp(cmd, "pwd") == 0){
+                printf("Entered 'pwd' command block.\n"); /* Testing */
+                if(isLoggedIn == LOGGED_IN){
+                    status = system("pwd > ./serverftp_temp");
+                    if(status == 0){
+                        filePtr = fopen("serverftp_temp", "r");
+                        if(filePtr == NULL){
+                            strcpy(replyMsg, "500 Unable to display current working directory (filePtr missing).\n");
+                        }
+                        /* If the file doesn't exist or couldn't be opened, notify the user of the failure. */
+                        else{
+                            bytesRead = fread(fileData, 1, 1023, filePtr); /* Leave one byte for null-terminator */
+                            /* If the file is empty, something went wrong. Notify the user of the failure. */
+                            if(bytesRead <= 0){
+                                strcpy(replyMsg, "500 Unable to display current directory (read error).\n");
+                            }
+                            /* Read output file. */
+                            else{
+                                fileData[bytesRead] = '\0'; /* NULL-terminate the file data */
+                                strcpy(replyMsg, "257 ");
+                                strcat(replyMsg, fileData);
+                                strcat(replyMsg, "\n");
+                            } 
+                            /* File read successfully. Send the user the server response. */
+                        }
+                        fclose(filePtr);
+                        system("rm ./serverftp_temp");
+                        /* Clean up the file data */
+                    }
+                    else{
+                        strcpy(replyMsg, "500 Unable to display current directory (can not process command).\n");
+                    }
+                    /* The output file could not be created. Notify the user that it failed */
+                }
+                else{
+                    strcpy(replyMsg, "530 Not logged in.\n");
+                }
+            }
+            /* Allowing the pwd command in the system */
+            else if(strcmp(cmd, "ls") == 0){
+                if(isLoggedIn == LOGGED_IN){
+                    status = system("ls > ./serverftp_temp");
+                    if(status == 0){
+                        filePtr = fopen("./serverftp_temp", "r");
+                        /* If the file doesn't exist or couldn't be opened, notify the user of the failure. */
+                        if(filePtr == NULL){
+                            strcpy(replyMsg, "451 Unable to display directory contents (filePtr missing).\n");
+                        }
+                        /* Read the output file. */
+                        else{
+                            bytesRead = fread(fileData, 1, 1024, filePtr);
+                            /* Unable to read file. Notify user of failure. */
+                            if(bytesRead < 0){
+                                strcpy(replyMsg, "451 Unable to display directory contents (read error).\n");
+                            }
+                            /* File read successful. Send user the server response. */
+                            else{
+                                if(bytesRead == 0){
+                                    strcpy(fileData, "The current directory is empty.");
+                                }
+                                fileData[bytesRead] = NULL; /*NULL-terminate the file data */
+                                strcpy(replyMsg, "\n");
+                                strcat(replyMsg, fileData);
+                                strcat(replyMsg, "\n250 Requested file action okay, completed.\n");
+                            }
+                        }
+                        /* Clean up */
+                        fclose(filePtr);
+                        system("rm ./serverftp_temp");
+                    }
+                    /* Output file could not be created. Therefore, notify the user of failure */
+                    else{
+                        strcpy(replyMsg, "451 Unable to display directory contents (can not process command).\n");
+                    }
+                }
+                else{
+                    strcpy(replyMsg, "530 Not logged in.\n");
+                }
+            }
+            /* Allowing the ls command in the system */
+            else if(strcmp(cmd, "ls") == 0){
+                if(isLoggedIn == LOGGED_IN){
+                    status = system("ls > ./serverftp_temp");
+                    if(status == 0){
+                        filePtr = fopen("./serverftp_temp", "r");
+                        /* Notify the user of a failure if the file either does not exist or could  */
+                        if(filePtr == NULL){
+                            strcpy(replyMsg, "451 Unable to display directory contents (filePtr missing).\n");
+                        }
+                        /* Reads the output file */
+                        else{
+                            bytesRead = fread(fileData, 1, 1024, filePtr);
+                            /* Notify the user of a failure to read the file. */
+                            if(bytesRead < 0){
+                                strcpy(replyMsg, "451 Unable to display directory contents (read error).\n");
+                            }
+                            /* The file was successfully read. Send the server response to the user.*/
+                            else{
+                                if(bytesRead == 0){
+                                    strcpy(fileData, "The current directory is empty.");
+                                }
+                                fileData[bytesRead] = NULL; /*Terminate the file data with NULL.*/
+                                strcpy(replyMsg, "\n");
+                                strcat(replyMsg, fileData);
+                                strcat(replyMsg, "\n250 Requested file action okay, completed.\n");
+                            }
+                        }
+                        /* Perform the necessary cleanup. */
+                        fclose(filePtr);
+                        system("rm ./serverftp_temp");
+                    }
+                    /* Notify the user of a failure to create the output file. */
+                    else{
+                        strcpy(replyMsg, "451 Unable to display directory contents (can not process command).\n");
+                    }
+                } /* State that the user isn't logged in. */
+                else{
+                    strcpy(replyMsg, "530 Not logged in.\n");
+                }
+            }
+            
+            /* Allowing the send command in the system */
+            else if(strcmp(cmd, "send") == 0){
+            
+                /* Attempt a data connection even in the presence of errors to avoid the client from continuously listening. */
+                printf("Calling clntConnect to connect to the client.\n");
+                status=clntConnect("192.168.200.230", &dcSocket);  /* Off-campus IP: "143.241.37.230" */
+                if(status != 0){
+                    /* Notify the client that the data connection has failed, close the data connection socket. */
+                    strcpy(replyMsg, "425 'send' could not open data connection. Closing data connection socket.\n");
+                }
+                else{
+                    /* Ensure that the user is logged in and has provided a filename after establishing the data connection. */
+                    printf("Data connection established to client.\n");
+                    if(argument[0] == NULL || strcmp(argument, "") == 0){
+                        /* Discard any message received on dcSocket due to an invalid argument. */
+                        strcpy(replyMsg, "501 Invalid syntax. Use: \"send <filename>\". Closing data connection.\n");
+                    }
+                    else if(isLoggedIn == LOGGED_IN){
+                        /* Check if the specified file can be written to after confirming that the user is logged in. */
+                        filePtr = NULL;
+                        filePtr = fopen(argument, "w");
+                        if(filePtr == NULL){
+                            /* If it's impossible to write to the specified file, discard any message received on the data connection socket.*/
+                            strcpy(replyMsg, "550 The file \"");
+                            strcat(replyMsg, argument);
+                            strcat(replyMsg, "\" could not be opened/created. Closing data connection.\n");
+                        }else{
+                            /* Start receiving the file data when the file is confirmed to be writable, and continue until no more data is received or no message can be retrieved.*/
+                            ftpBytes = 0; /* Set the byte count to its initial value. */
+                            printf("Waiting for file transmission from client.\n");
+                            do{
+                                bytesReceived = 0;
+                                status = receiveMessage(dcSocket, ftpData, sizeof(ftpData), &bytesReceived);
+                                fwrite(ftpData, 1, bytesReceived, filePtr);
+                                ftpBytes = ftpBytes + bytesReceived;
+                            }while(bytesReceived > 0 && status == OK); /* Terminate the loop for reading data from the data connection. */
+                            sprintf(replyMsg, "226 Received %d", ftpBytes);
+                            strcat(replyMsg, " bytes. Closing data connection.\n");
+                        }
+                        fclose(filePtr); /* Close the file, regardless of whether it was successfully received or not. */
+                    }
+                    else{
+                        /* If the user is not logged in, discard any message received on the dcSocket. */
+                        strcpy(replyMsg, "530 Not logged in. Closing data connection.\n");
+                    }
+                }
+                printf("Data connection closed.\n");
+                close(dcSocket); /* Close the data connection socket regardless of any errors that may have occurred. */
+            }
+            
+            /* Allowing the recv command in the system */
+            else if(strcmp(cmd, "recv") == 0){
+                /* Try to establish a data connection even if there is an error to prevent the client from waiting indefinitely. */
+                printf("Calling clntConnect to connect to the client.\n");
+                status=clntConnect("192.168.200.230", &dcSocket);  /* Off-campus IP: "143.241.37.230" */
+                if(status != 0){
+                    /* When a data connection fails, send a response to the client and close the socket for the data connection. */
+                    strcpy(replyMsg, "425 'recv' could not establish data connection. Closing data connection socket.\n");
+                }else{
+                    printf("Data connection to client successful.\n");
+                    /* The data connection was established successfully. Verify that the user has logged in and provided a filename. */
+                    if(argument[0] == NULL || strcmp(argument, "") == 0){
+                        strcpy(replyMsg, "501 Invalid syntax. Use: \"send <filename>\". Closing Data connection.\n");
+                    }
+                    else if(isLoggedIn == LOGGED_IN){
+                    
+                        /* Make sure that the file specified can be read. */
+                        filePtr = NULL;
+                        filePtr = fopen(argument, "r");
+                        if(filePtr == NULL){
+                            strcpy(replyMsg, "550 The file \"");
+                            strcat(replyMsg, argument);
+                            strcat(replyMsg, "\" could not be opened. Closing data connection.");
+                        }
+                        else{
+                            /* The file is readable, start sending its contents until the end is reached. */
+                            ftpBytes = 0; /* set bytes to 0 */
+                            printf("Sending file.\n");
+                            do{
+                                fileBytesRead = 0;
+                                fileBytesRead = fread(ftpData, 1, 100, filePtr); /* The number of bytes read is returned by read error, making it impossible to distinguish it from a non-error situation. */
+                                status = sendMessage(dcSocket, ftpData, fileBytesRead); /* Avoid modifying the file contents and refrain from adding a NULL element. */
+                                ftpBytes = ftpBytes + fileBytesRead;
+                            }while(!feof(filePtr) && status == OK); /* Terminate the file sending loop. */
+                            sprintf(replyMsg, "226 Sent %d", ftpBytes);
+                            strcat(replyMsg, " bytes. Closing data connection.");
+                        }
+                        fclose(filePtr); /* Close the file, regardless of whether it was successfully sent or not. */
+                    }
+                    else{
+                        strcpy(replyMsg, "530 Not logged in. Closing data connection.\n");
+                    }
+                }
+                close(dcSocket); /* Close the data connection regardless of whether there was an error or not. */
+            }
+            
+        }
+		/* Send a response to the quit command. */
 		else if(strcmp(cmd, "quit") == 0){
 			strcpy(replyMsg, "221 Service closing data and control connections.\n");
+
+			printf("Closing data connection socket.\n");
+			close (dcSocket);  /* Close server data connection socket */
+
+			printf("Closing control connection socket.\n");
+			close (ccSocket);  /* Close client control connection socket */
+
+			printf("Closing listen socket.\n");
+			close(listenSocket);  /*close listen socket */
+
+			printf("Exiting from server ftp main. \n");
+
+			return (status);
 		}
 		
-		/* cmd is not a valid command */
+		/* The input command is invalid and cannot be recognized. */
 		else{
 			strcpy(replyMsg, "502 Command not implemented. Use \"help\" for a list of valid commands.\n");
 		}
+	
+	
 		
 	    /*
  	     * ftp server sends only one reply message to the client for 
 	     * each command received in this implementation.
-	     */
+	     */    
+
 	    status=sendMessage(ccSocket,replyMsg,strlen(replyMsg) + 1);	/* Added 1 to include NULL character in */
 				/* the reply string strlen does not count NULL character */
 	    if(status < 0)
-	    {
+	    {	
 		break;  /* exit while loop */
 	    }
-	}
-	while(strcmp(cmd, "quit") != 0);
-	
-	printf("Closing data connection socket.\n");
-	close (dcSocket);  /* Close server data connection socket */
-
-	printf("Closing control connection socket.\n");
-	close (ccSocket);  /* Close client control connection socket */
-
-	printf("Closing listen socket.\n");
-	close(listenSocket);  /*close listen socket */
-
-	printf("Existing from server ftp main. \n");
-
-	return (status);
+	}	
+	while(1);
+	free(cmd);
+    	free(argument);
 }
 
 
@@ -591,74 +664,54 @@ int main(
  * svcInitServer
  *
  * Function to create a socket and to listen for connection request from client
- *    using the created listen socket.
+ * using the created listen socket.
  *
  * Parameters
- * s		- Socket to listen for connection request (output)
+ * s        - Socket to listen for connection request (output)
  *
  * Return status
- *	OK			- Successfully created listen socket and listening
- *	ER_CREATE_SOCKET_FAILED	- socket creation failed
+ *  OK                      - Successfully created listen socket and listening
+ *  ER_CREATE_SOCKET_FAILED - socket creation failed
  */
 
-int svcInitServer (
-	int *s 		/*Listen socket number returned from this function */
-	)
-{
+int svcInitServer(int *s) {
+
 	int sock;
-	struct sockaddr_in svcAddr;
-	int qlen;
+    	struct sockaddr_in svcAddr;
+    	int qlen;
 
-	/*create a socket endpoint */
-	if( (sock=socket(AF_INET, SOCK_STREAM,0)) <0)
-	{
-		perror("cannot create socket");
-		return(ER_CREATE_SOCKET_FAILED);
-	}
-
-	/*initialize memory of svcAddr structure to zero. */
-	memset((char *)&svcAddr,0, sizeof(svcAddr));
-
-	/* initialize svcAddr to have server IP address and server listen port#. */
-	svcAddr.sin_family = AF_INET;
-	svcAddr.sin_addr.s_addr=htonl(INADDR_ANY);  /* server IP address */
-	svcAddr.sin_port=htons(SERVER_FTP_PORT);    /* server listen port # */
-
-	/* bind (associate) the listen socket number with server IP and port#.
-	 * bind is a socket interface function 
-	 */
-	if(bind(sock,(struct sockaddr *)&svcAddr,sizeof(svcAddr))<0)
-	{
-		perror("cannot bind");
-		close(sock);
-		return(ER_BIND_FAILED);	/* bind failed */
-	}
-
-	/* 
-	 * Set listen queue length to 1 outstanding connection request.
-	 * This allows 1 outstanding connect request from client to wait
-	 * while processing current connection request, which takes time.
-	 * It prevents connection request to fail and client to think server is down
-	 * when in fact server is running and busy processing connection request.
-	 */
-	qlen=1; 
+    /* Create a socket endpoint */
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("cannot create socket");
+        return (ER_CREATE_SOCKET_FAILED);
+    }
 
 
-	/* 
-	 * Listen for connection request to come from client ftp.
-	 * This is a non-blocking socket interface function call, 
-	 * meaning, server ftp execution does not block by the 'listen' funcgtion call.
-	 * Call returns right away so that server can do whatever it wants.
-	 * The TCP transport layer will continuously listen for request and
-	 * accept it on behalf of server ftp when the connection requests comes.
-	 */
+    /* Initialize memory of svcAddr structure to zero. */
+    memset((char *)&svcAddr, 0, sizeof(svcAddr));
 
-	listen(sock,qlen);  /* socket interface function call */
+    /* Initialize svcAddr to have server IP address and server listen port#. */
+    svcAddr.sin_family = AF_INET;
+    svcAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    svcAddr.sin_port = htons(SERVER_FTP_PORT);
 
-	/* Store listen socket number to be returned in output parameter 's' */
-	*s=sock;
+    /* Bind the listen socket number with server IP and port#. */
+    if (bind(sock, (struct sockaddr *)&svcAddr, sizeof(svcAddr)) < 0) {
+        perror("cannot bind");
+        close(sock);
+        return (ER_BIND_FAILED);
+    }
 
-	return(OK); /*successful return */
+    /* Set listen queue length to 1 outstanding connection request. */
+    qlen = 1;
+
+    /* Listen for connection requests from client ftp. */
+    listen(sock, qlen);
+
+    /* Store listen socket number to be returned in output parameter 's' */
+    *s = sock;
+
+    return (OK);
 }
 
 /*
@@ -666,8 +719,8 @@ int svcInitServer (
  *
  * Copied from clientftp.c.
  *
- * Function to create a socket, bind local client IP address and port to the socket
- * and connect to the client.
+ * This function creates a socket, associates the local client IP address and port with the socket, and establishes a connection to the client.
+ * 
  *
  * Parameters
  * serverName	- IP address of client in dot notation (input)
@@ -681,69 +734,66 @@ int svcInitServer (
  *	ER_CONNECT_FAILED	- connect failed
  */
 int clntConnect (
-	char *serverName, /* client IP address in dot notation (input) */
-	int  *s 		  /* control connection socket number (output) */
+	char *serverName, /* The IP address of the client in dotted decimal notation (input). */
+	int  *s 		  /* Output parameter for the function that represents the socket number for the control connection. */
 	)
 {
-	int sock;	/* local variable to keep socket number */
+	int sock;	/* Local variable to store the socket descriptor/identifier. */
 
-	struct sockaddr_in clientAddress;  	/* local server IP address */
-	struct sockaddr_in serverAddress;	/* client IP address */
-	struct hostent	   *serverIPstructure;	/* host entry having server IP address in binary */
+	struct sockaddr_in clientAddress;  	/* The IP address of the local server as a string. */
+	struct sockaddr_in serverAddress;	/* IP address of the client.*/
+	struct hostent	   *serverIPstructure;	/* A host entry containing the server's IP address in binary format.*/
 
-
-	/* Get IP address of client in binary from client name (IP in dot notation) */
+	/* Retrieve the binary IP address of the client from the client name (in dot notation). */
 	if((serverIPstructure = gethostbyname(serverName)) == NULL)
 	{
 		printf("%s is unknown server. \n", serverName);
-		return (ER_INVALID_HOST_NAME);  /* error return */
+		return (ER_INVALID_HOST_NAME);  /* A return value indicating an error for a host name. */
 	}
 
-	/* Create control connection socket */
+	/* Create a socket for the control connection. */
 	if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		perror("cannot create socket ");
-		return (ER_CREATE_SOCKET_FAILED);	/* error return */
+		return (ER_CREATE_SOCKET_FAILED);	/* A return value indicating an error for a socket. */
 	}
 
-	/* initialize server address structure memory to zero */
+	/* Clear the memory of the server address structure. */
 	memset((char *) &clientAddress, 0, sizeof(clientAddress));
 
-	/* Set local server IP address, and port in the address structure */
-	clientAddress.sin_family = AF_INET;	/* Internet protocol family */
-	clientAddress.sin_addr.s_addr = htonl(INADDR_ANY);  /* INADDR_ANY is 0, which means */
-						 /* let the system fill server IP address */
-	clientAddress.sin_port = 0;  /* With port set to 0, system will allocate a free port */
-			  /* from 1024 to (64K -1) */
+	/* Set the IP address and port of the local server in the address structure. */
+	clientAddress.sin_family = AF_INET;	/* The protocol family used for communication over the network. */
+	clientAddress.sin_addr.s_addr = htonl(INADDR_ANY);  /* The value of INADDR_ANY is 0, so by using it, the system is allowed to fill in the server IP address automatically. */
+	clientAddress.sin_port = 0;  /* When the port number is set to 0, the system will automatically allocate a free port from 1024 to (64K -1) */
 
-	/* Associate the socket with local server IP address and port */
+	/* Associate the socket with the local server IP address and port by binding it.*/
 	if(bind(sock,(struct sockaddr *)&clientAddress,sizeof(clientAddress))<0)
 	{
 		perror("cannot bind");
 		close(sock);
-		return(ER_BIND_FAILED);	/* bind failed */
+		return(ER_BIND_FAILED);	/* Binding of the socket was unsuccessful. */
 	}
 
 
-	/* Initialize serverAddress memory to 0 */
+	/* Reset the memory of serverAddress to 0. */
 	memset((char *) &serverAddress, 0, sizeof(serverAddress));
 
-	/* Set ftp client ftp address in serverAddress */
+	/* Set the FTP client address in the serverAddress structure. */
 	serverAddress.sin_family = AF_INET;
 	memcpy((char *) &serverAddress.sin_addr, serverIPstructure->h_addr, 
 			serverIPstructure->h_length);
 	serverAddress.sin_port = htons(DATA_CONNECTION_PORT);
 
-	/* Connect to the client */
+	/* Establish a connection to the FTP client. */
 	if (connect(sock, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
 	{
 		perror("Cannot connect to client ");
-		close (sock); 	/* close the control connection socket */
+		close (sock); 	/* Close the socket used for the control connection. */
 		return(ER_CONNECT_FAILED);  	/* error return */
 	}
 
 
-	/* Store listen socket number to be returned in output parameter 's' */
+	/* Save the listen socket number and assign it to the output parameter 's'. */
 	*s=sock;
 
 	return(OK); /* successful return */
@@ -835,6 +885,3 @@ int receiveMessage (
 
 	return (OK);
 }
-
-
-
